@@ -1,5 +1,7 @@
 ﻿using DogGroomingQueue.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using DogGroomingQueue.Api.DTOs;
+
 
 namespace DogGroomingQueue.Api.Data;
 
@@ -13,6 +15,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<GroomingType> DogGroomingTypes => Set<GroomingType>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<AppointmentResponse> AppointmentResponses => Set<AppointmentResponse>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -33,6 +37,9 @@ public class ApplicationDbContext : DbContext
             entity.ToTable("Appointments_Ta");
             entity.HasKey(x => x.AppointmentId_Int);
         });
+       
+        modelBuilder.Entity<AppointmentResponse>()
+        .HasNoKey();
 
         base.OnModelCreating(modelBuilder);
     }

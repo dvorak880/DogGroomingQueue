@@ -1,11 +1,8 @@
-﻿using DogGroomingQueue.Api.Data;
-using DogGroomingQueue.Api.DTOs;
+﻿using DogGroomingQueue.Api.DTOs;
+using DogGroomingQueue.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using Dapper;
 
 namespace DogGroomingQueue.Api.Controllers;
 
@@ -14,15 +11,11 @@ namespace DogGroomingQueue.Api.Controllers;
 [Authorize]
 public class AppointmentsController : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
-    private readonly IConfiguration _configuration;
+    private readonly IAppointmentService _appointmentService;
 
-    public AppointmentsController(
-        ApplicationDbContext context,
-        IConfiguration configuration)
+    public AppointmentsController(IAppointmentService appointmentService)
     {
-        _context = context;
-        _configuration = configuration;
+        _appointmentService = appointmentService;
     }
 
     private int GetCurrentUserId()
@@ -30,31 +23,99 @@ public class AppointmentsController : ControllerBase
         return int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     }
 
+    [HttpGet]
+    public async Task<IActionResult> GetAppointments(
+        [FromQuery] string? customerName,
+        [FromQuery] DateTime? fromDate,
+        [FromQuery] DateTime? toDate)
+    {
+        var appointments = await _appointmentService.GetAppointmentsAsync(
+            customerName,
+            fromDate,
+            toDate);
+
+        return Ok(appointments);
+    }
+
     [HttpPost]
     public async Task<IActionResult> CreateAppointment(CreateAppointmentRequest request)
     {
         var userId = GetCurrentUserId();
 
-        using var connection = new SqlConnection(
-            _configuration.GetConnectionString("DefaultConnection"));
-
-        var parameters = new
-        {
-            UserId = userId,
-            GroomingTypeId = request.GroomingTypeId,
-            AppointmentDateTime = request.AppointmentDateTime
-        };
-
-        var newAppointmentId = await connection.ExecuteScalarAsync<int>(
-            "sp_CreateAppointment",
-            parameters,
-            commandType: System.Data.CommandType.StoredProcedure
-        );
+        var newAppointmentId = await _appointmentService.CreateAppointmentAsync(
+            userId,
+            request);
 
         return Ok(new
         {
             AppointmentId = newAppointmentId,
             Message = "התור נוסף בהצלחה"
         });
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateAppointment(
+        int id,
+        UpdateAppointmentRequest request)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+
+            await _appointmentService.UpdateAppointmentAsync(
+                userId,
+                id,
+                request);
+
+            return Ok("התור עודכן בהצלחה");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Forbid(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteAppointment(int id)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+
+            await _appointmentService.DeleteAppointmentAsync(userId, id);
+
+            return Ok("התור נמחק בהצלחה");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Forbid(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetAppointmentById(int id)
+    {
+        try
+        {
+            var appointment = await _appointmentService.GetAppointmentDetailsByIdAsync(id);
+
+            return Ok(appointment);
+        }
+        catch (Exception ex)
+        {
+            return NotFound(ex.Message);
+        }
     }
 }

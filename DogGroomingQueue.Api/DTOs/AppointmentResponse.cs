@@ -3,6 +3,8 @@
 public class AppointmentResponse
 {
     public int AppointmentId { get; set; }
+    
+    public int UserId { get; set; }
 
     public string CustomerName { get; set; } = string.Empty;
 
